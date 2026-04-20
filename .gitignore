@@ -1,0 +1,28 @@
+# Environments
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data (Không đẩy data thô lên Git vì tốn dung lượng và vi phạm chuẩn)
+SampleData20111104/
+*.csv
+*.label
+
+# Outputs (Model được lưu, log file, và biểu đồ - sẽ được máy chủ Kaggle sinh ra)
+outputs/
+*.keras
+*.h5
+*.npy
+
+# IDEs / OS files
+.vscode/
+.idea/
+.DS_Store
+.ipynb_checkpoints/
+
+# System generated logs from the agent (nếu có)
+.system_generated/
+scratch/
