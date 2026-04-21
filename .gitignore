@@ -1,4 +1,6 @@
-# Environments
+# environment 
+.venv/
+.vscode/settings.json    
 venv/
 env/
 .env
@@ -6,12 +8,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Data (Không đẩy data thô lên Git vì tốn dung lượng và vi phạm chuẩn)
+# Data
 SampleData20111104/
+src/SampleData/
+src/data/
 *.csv
 *.label
 
-# Outputs (Model được lưu, log file, và biểu đồ - sẽ được máy chủ Kaggle sinh ra)
+# Outputs model
 outputs/
 *.keras
 *.h5
@@ -23,6 +27,4 @@ outputs/
 .DS_Store
 .ipynb_checkpoints/
 
-# System generated logs from the agent (nếu có)
-.system_generated/
-scratch/
+

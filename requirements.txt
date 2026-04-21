@@ -1,13 +1,9 @@
+
 # AutoCPD Change-Point Detection — Requirements
 # Cài đặt: pip install -r requirements.txt
-
-# Thư viện chính (từ paper)
+tensorflow_docs
 autocpd>=0.1.3
-
-# Deep Learning framework (cần >= 2.7 theo yêu cầu autocpd)
 tensorflow>=2.10.0
-
-# Khoa học dữ liệu
 numpy>=1.21.0
 pandas>=1.3.0
 scikit-learn>=1.0.0
