@@ -1,5 +1,30 @@
 # environment 
 .venv/
 .vscode/settings.json    
-src/data/
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data
+SampleData20111104/
 src/SampleData/
+src/data/
+*.csv
+*.label
+
+# Outputs model
+outputs/
+*.keras
+*.h5
+*.npy
+
+# IDEs / OS files
+.vscode/
+.idea/
+.DS_Store
+.ipynb_checkpoints/
+
+
