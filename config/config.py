@@ -12,13 +12,18 @@ import os
 # PATHS — tự động resolve dựa trên vị trí file này
 # =============================================================================
 # Root của project (thư mục chứa config/)
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-
+try:
+    PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+except NameError:
+    # chạy trong notebook (Kaggle / Jupyter)
+    PROJECT_ROOT = pathlib.Path().resolve()
+    
 # Đường dẫn data — hỗ trợ cả local và Kaggle
-_KAGGLE_DATA = pathlib.Path("/kaggle/input/hasc-sample-data/SampleData20111104/HascToolDataPrj/SampleData/0_sequence")
+_KAGGLE_DATA = pathlib.Path("/kaggle/input/datasets/phmpht/hsac-dataset/0_sequence")
 _LOCAL_DATA  = PROJECT_ROOT / "SampleData20111104" / "HascToolDataPrj" / "SampleData" / "0_sequence"
 
 DATA_ROOT: pathlib.Path = _KAGGLE_DATA if _KAGGLE_DATA.exists() else _LOCAL_DATA
+
 
 # Output
 OUTPUT_DIR     = PROJECT_ROOT / "outputs"
