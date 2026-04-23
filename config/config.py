@@ -55,7 +55,7 @@ NUM_TRIM      = 100   # Khoảng cách tối thiểu CP với đầu/cuối đo�
 KERNEL_SIZE   = (3, 25)         # Conv2D kernel
 N_FILTER      = 16              # Số CNN filters
 DROPOUT_RATE  = 0.3             # Dropout
-N_RESBLOCK    = 3               # Số residual blocks
+N_RESBLOCK    = 21              # Số residual blocks
 DENSE_WIDTHS  = [50, 40, 30]    # Width các Dense layers
 MODEL_NAME    = "HASC_AutoCPD"
 
@@ -64,7 +64,7 @@ MODEL_NAME    = "HASC_AutoCPD"
 # =============================================================================
 LEARNING_RATE     = 1e-3
 EPOCHS            = 200
-BATCH_SIZE        = 32
+BATCH_SIZE        = 16
 VALIDATION_SPLIT  = 0.2
 EARLY_STOP_PATIENCE = 30
 LR_DECAY_STEPS    = 5000
