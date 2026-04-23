@@ -4,8 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import tensorflow_docs.modeling as tfdoc_model
-import tensorflow_docs.plots as tfdoc_plot
+
 from sklearn.utils import shuffle
 
 from autocpd.neuralnetwork import compile_and_fit, general_simple_nn
@@ -58,7 +57,7 @@ def stimulate_data(
       n=length_ts,
       B_bound=B_bound,
       ARcoef=rho,
-      signma=sigma,
+      sigma=sigma,
       tau_bound=tau_bound,
       scale=scale,
       ar_model=ar_model_name,
