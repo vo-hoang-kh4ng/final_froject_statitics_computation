@@ -29,20 +29,43 @@ Hệ thống sử dụng kỹ thuật nâng cấp số lượng kênh (Channel E
 
 ---
 
-## CHƯƠNG 3: THỰC NGHIỆM TRÊN DỮ LIỆU TOÁN HỌC (SYNTHETIC DATA)
-Để đánh giá sức kháng nhiễu cực đoan của mô hình, đồ án thực hiện kiểm thử trên bộ dữ liệu giả lập.
+## CHƯƠNG 3: BENCHMARK MÔ HÌNH VỚI DỮ LIỆU GIẢ LẬP (SYNTHETIC DATA)
+Mục đích của chương này **không phải để huấn luyện một mô hình ứng dụng**, mà hoàn toàn dùng như một môi trường kiểm thử (Benchmark) nội suy toán học. Chúng ta sử dụng dữ liệu giả lập (Stimulated Data) để đối đầu trực tiếp thuật toán ResNet với kiểm định thống kê CUSUM truyền thống.
 
-### 3.1 Dữ liệu phân phối Cauchy (Heavy-tailed)
-- **Thiết lập:** Dữ liệu được sinh bằng nhiễu ngẫu nhiên phân phối Cauchy (`ARH` model). Đây là phân phối có đặc tính sinh ra các đỉnh nhiễu (outliers) khổng lồ không theo quy luật, là "tử huyệt" làm CUSUM tụt giảm độ chính xác xuống chỉ còn ~50% (bằng với tỷ lệ đoán mò).
-- **Kết quả huấn luyện:** Mạng ResNet (AutoCPD) được huấn luyện trong cấu hình bản lề `kernel=(1,25)` (sau đó ép lên `Channels=2` như đề cập ở 2.2). Lợi dụng tính chất Pooling trôi dạt của mạng Tích chập, mô hình tự động bỏ qua (Smooth out) các nhiễu rác và hội tụ tối ưu cực kỳ vững sau 33 Epochs. Validation Accuracy dừng ở ngưỡng tối ưu để chống Overfitting (Chịu chung đặc thù khó lường của dữ liệu Cauchy, nhưng vẫn chứng minh thực nghiệm vượt xa CUSUM).
-- **Kết luận:** Mô hình Deep Learning thể hiện khả năng "Distribution-free" (không lệ thuộc luật phân phối), xử lý tốt các ngoại lai mà Thống kê cổ điển thất bại hoàn toàn.
+### 3.1 Cấu hình Thực nghiệm
+Kịch bản thí nghiệm được thiết kế với độ dài chuỗi $n = 100$ và 4 kịch bản nhiễu đặc rỗng, tiến hành so sánh CUSUM (với ngưỡng được tinh chỉnh tối ưu trên tập huấn luyện) với kiến trúc Neural Network ($H_{\{1,m-1\}}$). Tập kiểm tra gồm khoảng 30.000 mẫu đại diện.
+
+**Bảng: Kết quả so sánh các kịch bản nhiễu**
+
+| Kịch bản | Loại nhiễu | Tự tương quan | Kết quả NN vs CUSUM |
+| :--- | :--- | :--- | :--- |
+| **S1** | Gaussian N(0,1) | ρₜ = 0 (i.i.d.) | Tương đương CUSUM |
+| **S1'** | Gaussian N(0,1) | ρₜ = 0.7 (cố định) | **NN vượt trội CUSUM** |
+| **S2** | Gaussian N(0,2) | ρₜ ~ Unif[0,1] (ngẫu nhiên) | **NN vượt trội CUSUM** |
+| **S3** | Cauchy(0, 0.3) | ρₜ = 0 (heavy-tailed) | **NN vượt trội rõ rệt** |
+
+### 3.2 Phân tích Đánh giá (Evaluate)
+*(>> Chèn hình ảnh `synthetic_confusion_matrices.png` và biểu đồ Accuracy vào đây <<)*
+
+1. **Kịch bản S1 — Gaussian i.i.d.:** Neural network đạt MER (Misclassification Error Rate) xấp xỉ bằng CUSUM, xác nhận **Theorem 4.3** trong lý thuyết: *với đủ lượng dữ liệu lớn, mạng Nơ-ron không thể kém hơn CUSUM*. Đây là điều kiện lý tưởng "sân nhà" cho CUSUM, nhưng ResNet không hề bị bỏ lại.
+2. **Kịch bản S1′ và S2 — Nhiễu có tự tương quan:** Neural network vượt trội hoàn toàn rõ rệt so với CUSUM. Mạng CNN tự động học được cách xử lý sự tự tương quan chuỗi dọc (Autoregressive), trong khi CUSUM mặc định giả định nhiễu là độc lập nên bị thiên lệch nghiêm trọng và báo động giả.
+3. **Kịch bản S3 — Nhiễu Cauchy (Đuôi nặng - Heavy-tailed):** Tại đây Neural network vượt trội mạnh mẽ nhất. Phân phối Cauchy hoàn toàn không có moment hữu hạn, khiến các phương pháp dựa trên trung bình như CUSUM hoạt động yếu kém. Ngược lại, Neural network nội suy linh hoạt hơn vì bản chất nó "Distribution-free" - hoàn toàn không cần ép buộc quy luật phân phối cụ thể.
+
+> **Quan sát thêm:** Việc tăng số Layers có thể giúp giảm MER đáng kể khi tập mẫu huấn luyện bị ép nhỏ ($N \le 200$), chứng minh rằng mạng Sâu (Deep) có ưu thế trích xuất luật lệ tốt hơn ở điều kiện dữ liệu hạn chế. Tuy nhiên, khi N mở rộng đủ lớn, mọi kiến trúc nông sâu đều sẽ tiệm cận về hiệu năng lý tưởng như nhau.
 
 ---
 
-## CHƯƠNG 4: THỰC NGHIỆM TRÊN DỮ LIỆU THỰC TẾ (HASC DATASET)
-Áp dụng mô hình để phát hiện sự thay đổi hành vi con người (Walk, Jog, Skip, Stay) dựa trên tín hiệu gia tốc kế tổng hợp 3 trục (X, Y, Z).
+## CHƯƠNG 4: THỰC NGHIỆM CHI TIẾT TRÊN DỮ LIỆU THỰC TẾ (HASC DATASET)
+Đây là phần huấn luyện (Train) chủ đạo của Đồ án. Áp dụng mô hình để phát hiện sự thay đổi hành vi con người dựa trên tín hiệu gia tốc kế.
 
-### 4.1 Quy trình thực thi
+### 4.1 Mô tả Dữ liệu Đầu vào (HASC Data Description)
+*(>> Chèn hình ảnh `hasc_data_description.png` mà hệ thống xuất ra vào đây <<)*
+- **Tập dữ liệu HASC (Human Activity Sensing Consortium):** Thu thập tín hiệu cảm biến Gia tốc kế 3 chiều (X: Lateral, Y: Vertical, Z: Forward) đeo trên người đối tượng.
+- **Tập thao tác:** Gồm 6 nhãn chuyển động tự nhiên ngẫu nhiên: `Walk` (Đi bộ), `Jog` (Chạy bộ), `Skip` (Nhảy bước), `Stay` (Đứng/ngồi yên), `stUp` (Lên cầu thang), `stDown` (Xuống cầu thang).
+- **Tần số lấy mẫu:** Khoảng 100Hz. Các tín hiệu có độ nhấp nhô cực kỳ đặc trưng (Ví dụ: `Stay` nằm phẳng biên độ dao động tiệm cận 0, `Jog` biên độ vọt lên dốc 3g - 4g).
+- **Khó khăn:** Các nhãn không được tách rời mà nối tiếp nhau liên tục trong một sequence dài hàng nghìn điểm (Ví dụ: File `HASC1016.csv` chứa 11941 samples với 11 điểm đổi hành động). Việc dùng quy luật Thống kê tìm điểm đổi pha là bất khả thi vì tín hiệu nhiễu và đè lấp lên nhau.
+
+### 4.2 Tiền xử lý & Huấn luyện (Training Pipeline)
 - Dữ liệu thô từ HASC được nén thành chuỗi ma trận đa chiều, kết hợp dữ liệu bình phương nâng tổng số kênh lên 6 (Channels=6).
 - ResNet (với 120,000+ tham số) học các đoạn chuyển tiếp hành động (Ví dụ: `Walk -> Jog`) và đóng vai trò như một bộ phân loại (Classifier).
 
