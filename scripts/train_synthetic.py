@@ -3,104 +3,99 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-# Thêm root dự án vào sys.path để import được config và src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import config
-from src.model import ModelBuilder
-from src.training import ModelTrainer
+from src.model.builder import MLPBuilder
 from src.data_utils.stimulate_data import stimulate_data
+import matplotlib.pyplot as plt
 
 def main():
     config.setup()
     print("=" * 70)
-    print("BƯỚC 1: HUẤN LUYỆN DEEP NN TRÊN DỮ LIỆU TỔNG HỢP CAUCHY (SYNTHETIC DATA)")
+    print("BƯỚC 1: HUẤN LUYỆN MLP TRÊN DỮ LIỆU TỔNG HỢP CAUCHY (SYNTHETIC DATA)")
     print("=" * 70)
     
     np.random.seed(config.NUMPY_SEED)
     tf.random.set_seed(config.TF_SEED)
 
-    # 1. Sinh dữ liệu ảo (Cauchy Distribution)
-    # Cauchy distribution có tính chất Heavy-tailed (nhiễu ngoại lai giật chóp rất mạnh)
-    # Đây là nơi CUSUM cổ điển chết hoàn toàn, nhưng Deep Learning sẽ tỏa sáng.
     print("\n[PHASE 1] TẠO DỮ LIỆU GIẢ LẬP (CAUCHY DISTRIBUTION)")
     length_ts = config.WINDOW_LENGTH
-    sample_size = 2000 # Kích thước tập dữ liệu huấn luyện
+    sample_size = 2000
     
     x_train, y_train, tau_train, mu_R_train = stimulate_data(
         length_ts=length_ts, 
         sample_size=sample_size, 
         scale=0.3, 
-        ar_model_name='ARH' # Gọi model Cauchy heavy-tail
+        ar_model_name='ARH'
     )
     
     print(f"[INFO] Tổng số mẫu: {len(x_train)}")
     
-    # Dữ liệu hiện đang là (N, length_ts). 
-    # Mạng Conv2D bên trong general_deep_nn yêu cầu shape 3 chiều là (N, số kênh, thời gian)
-    # Vì đây là chuỗi 1 chiều (1D Time Series) nên số kênh là 1.
-    if len(x_train.shape) == 2:
-        x_train = np.expand_dims(x_train, axis=1) # Trở thành (N, 1, length_ts)
-    elif len(x_train.shape) == 3 and x_train.shape[-1] == 1:
-        x_train = np.transpose(x_train, (0, 2, 1))
-        
-    # [FIX] Mạng general_deep_nn có lóp MaxPooling2D((2,2)) nên yêu cầu tối thiểu 2 kênh.
-    # Ta ghép thêm 1 kênh dữ liệu bình phương (Squared) để x_train thành (N, 2, length_ts). 
-    # Vừa chống crash lớp Pooling, vừa giúp ResNet học biến thiên theo bình phương (variance) siêu bén.
+    # MLP 1D yêu cầu (N, Sequence, Channels)
+    # Bỏ đi việc transpoes và concatenate 2 kênh vì MLP không cần tránh Pooling lỗi,
+    # Nhưng giữ X^2 là phép biến đổi Variance hợp lý
+    x_train = np.expand_dims(x_train, axis=-1)
     x_train_sq = np.square(x_train)
-    x_train = np.concatenate([x_train, x_train_sq], axis=1)
+    x_train_cc = np.concatenate([x_train, x_train_sq], axis=-1) # (N, 100, 2)
         
-    print(f"[INFO] Input shape: {x_train.shape}")
-    
-    # Chuyển label mảng 2D thành vector 1D
+    print(f"[INFO] Input shape: {x_train_cc.shape}")
     y_train = y_train.flatten()
 
-    # 2. Xây dựng Model
-    print("\n[PHASE 2] XÂY DỰNG MÔ HÌNH RESNET")
-    # CỰC KỲ QUAN TRỌNG: Kernel_size phải đổi từ (3, 25) về (1, 25) 
-    synthetic_kernel_size = (2, 25)
+    print("\n[PHASE 2] XÂY DỰNG MÔ HÌNH MLP")
     
-    builder = ModelBuilder(
+    builder = MLPBuilder(
         n=length_ts,
-        n_trans=x_train.shape[1], # số channel = 1
-        kernel_size=synthetic_kernel_size,
-        n_filter=config.N_FILTER,
+        n_trans=x_train_cc.shape[-1], 
+        n_layers=5,
+        m_neurons=16,
         dropout_rate=config.DROPOUT_RATE,
-        n_classes=2, # Binary classification: 0 (Không điểm đổi) và 1 (Có điểm đổi)
-        n_resblock=config.N_RESBLOCK,
-        m=config.DENSE_WIDTHS,
-        l=len(config.DENSE_WIDTHS),
-        model_name="Cauchy_AutoCPD"
+        n_classes=2,
+        model_name="Cauchy_MLP_5Layers"
     )
     model = builder.build()
+    
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
-    # 3. Training
-    print("\n[PHASE 3] HUẤN LUYỆN")
-    trainer = ModelTrainer(
-        model=model,
-        learning_rate=config.LEARNING_RATE,
-        decay_steps=config.LR_DECAY_STEPS,
-        decay_rate=config.LR_DECAY_RATE,
-        epochs=config.EPOCHS,
-        batch_size=config.BATCH_SIZE,
-        validation_split=config.VALIDATION_SPLIT,
-        early_stop_patience=config.EARLY_STOP_PATIENCE
-    )
-    trainer.compile()
+    print("\n[PHASE 3] HUẤN LUYỆN 200 EPOCHS")
+    # Trainer không dùng ModelTrainer để loại bỏ cơ chế Early Stopping
+    # Chạy thẳng với keras fit 200 epochs để hội tụ ở Cauchy
     
-    # Save vô file riêng để không đè mất kết quả HASC của bạn
-    history = trainer.train(
-        x_train=x_train,
-        y_train=y_train,
-        log_csv_path=config.OUTPUT_DIR / "training_log_synthetic.csv",
-        best_model_path=config.OUTPUT_DIR / "best_model_synthetic.keras"
+    log_csv_path = config.OUTPUT_DIR / "training_log_synthetic.csv"
+    csv_logger = tf.keras.callbacks.CSVLogger(str(log_csv_path))
+    
+    history = model.fit(
+        x_train_cc, y_train,
+        epochs=200,
+        batch_size=config.BATCH_SIZE,
+        validation_split=0.2,
+        callbacks=[csv_logger],
+        verbose=1
     )
+    
+    model.save(config.OUTPUT_DIR / "best_model_synthetic.keras")
 
-    # 4. Xuất kết quả
     print("\n[PHASE 4] LƯU KẾT QUẢ VÀ LOGS")
-    plot_path = config.FIGURES_DIR / "training_curves_synthetic.png"
-    trainer.plot_history(history.history, plot_path)
+    plot_path = config.FIGURES_DIR / "training_curves_synthetic_mlp.png"
+    
+    # Plot history bằng Matplotlib
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['val_loss'], label='Val Loss')
+    plt.legend()
+    plt.title('Loss over 200 Epochs')
+    
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['accuracy'], label='Train Acc')
+    plt.plot(history.history['val_accuracy'], label='Val Acc')
+    plt.legend()
+    plt.title('Accuracy over 200 Epochs')
+    plt.tight_layout()
+    plt.savefig(str(plot_path))
+    plt.close()
     
     print(f"[SAVE] Biểu đồ training: {plot_path}")
     print("\nKết thúc huấn luyện Synthetic Data thành công!")

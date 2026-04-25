@@ -171,8 +171,7 @@ class HascDataLoader:
         
         ts_norm = 2 * (ts_combined - datamin) / denom - 1
         
-        # Chuyển kênh màu từ cuối lên đầu cho phù hợp với 1 số format
-        return np.transpose(ts_norm, (0, 2, 1))  # (N, 6, LENGTH)
+        return ts_norm  # (N, LENGTH, 6) để tương thích Conv1D
 
     def extract_sequence(self, subject: str, sequence_idx: int = 0):
         """Extract toàn bộ sequence cho detection method."""

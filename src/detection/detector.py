@@ -6,7 +6,6 @@ Phát hiện Change-Point trên chuỗi thời gian dài (Sliding Window).
 
 import numpy as np
 import tensorflow as tf
-from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 
 class ChangePointDetector:
@@ -28,7 +27,7 @@ class ChangePointDetector:
         denom = datamax - datamin
         denom[denom == 0] = 1e-8
         normalized = 2 * (combined - datamin) / denom - 1
-        return np.transpose(normalized, (0, 2, 1))
+        return normalized  # Mạng Conv1D nhận (N, W, C)
 
     def detect(self, seq_2d: np.ndarray):
         """
@@ -65,20 +64,34 @@ class ChangePointDetector:
         else:
             p_transition = 1 - probs[:, self.null_indices].sum(axis=1)
 
-        # Smoothing
-        smooth_n = min(self.config.SMOOTH_WIDTH // step, n_windows // 4)
-        smooth_n = max(smooth_n, 1)
-        kernel = np.ones(smooth_n) / smooth_n
-        p_smoothed = np.convolve(p_transition, kernel, mode="same")
+        # Smoothing (Algorithm 1)
+        # B1: Lấy nhãn cứng (L_i = 1 nếu prob > 0.5)
+        L = (p_transition >= 0.5).astype(float)
+        
+        # B2: Tính Trung bình trượt (Moving Average)
+        # Giống paper: Smooth qua cửa sổ xung quanh n_w
+        window_conv = max(1, wl // step)
+        kernel = np.ones(window_conv) / window_conv
+        p_smoothed = np.convolve(L, kernel, mode="same")
 
-        # Find peaks
-        min_distance = max(1, (wl // 2) // step)
-        peaks, _ = find_peaks(
-            p_smoothed,
-            height=self.config.PEAK_HEIGHT,
-            distance=min_distance,
-            prominence=self.config.PEAK_PROMINENCE,
-        )
+        # B3: Tìm các phân đoạn có L_bar >= \gamma (với \gamma = 0.5)
+        gamma = 0.5
+        activated = (p_smoothed >= gamma)
+        
+        # Tìm ranh giới các phân đoạn (segments)
+        diff = np.diff(np.concatenate(([0], activated.astype(int), [0])))
+        starts = np.where(diff == 1)[0]
+        ends = np.where(diff == -1)[0]
+        
+        peaks = []
+        for s, e in zip(starts, ends):
+            # B4: Argmax của L_bar trong từng phân đoạn
+            segment_vals = p_smoothed[s:e]
+            if len(segment_vals) > 0:
+                local_peak = s + np.argmax(segment_vals)
+                peaks.append(local_peak)
+                
+        peaks = np.array(peaks)
 
         cp_estimated_idx = window_centers[peaks] if len(peaks) > 0 else np.array([])
         return cp_estimated_idx, p_smoothed, window_centers, probs, peaks

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import config
-from src.model import ModelBuilder
+from src.model.builder import MLPBuilder
 from src.training import ModelTrainer
 import autocpd.utils as ut
 from src.data_utils.stimulate_data import stimulate_data
@@ -48,28 +48,26 @@ def evaluate_cusum(x_train, y_train, x_test, y_test):
     test_acc = accuracy_score(y_test, preds_test)
     return test_acc, best_th, preds_test
 
-def evaluate_resnet(x_train, y_train, x_test, y_test, model_name):
-    x_tr = np.expand_dims(x_train, axis=1)
-    x_te = np.expand_dims(x_test, axis=1)
+def evaluate_mlp(x_train, y_train, x_test, y_test, model_name):
+    # MLP nhận Input (N, n, n_trans) = (N, 100, 2)
+    x_tr_sq = np.square(x_train)
+    x_tr_cc = np.stack([x_train, x_tr_sq], axis=-1)  # (N, 100, 2)
     
-    x_tr_sq = np.square(x_tr)
-    x_tr_cc = np.concatenate([x_tr, x_tr_sq], axis=1) 
-    
-    x_te_sq = np.square(x_te)
-    x_te_cc = np.concatenate([x_te, x_te_sq], axis=1)
-    
-    builder = ModelBuilder(
-        n=100, n_trans=2, kernel_size=(2, 25), n_filter=16,
-        dropout_rate=0.2, n_classes=2, n_resblock=1, 
-        m=[32, 16], l=2, model_name=model_name
+    x_te_sq = np.square(x_test)
+    x_te_cc = np.stack([x_test, x_te_sq], axis=-1)
+
+    # Dùng MLP với 5 lớp như Mentor chỉ định
+    builder = MLPBuilder(
+        n=100, n_trans=2, n_layers=5, m_neurons=32,
+        dropout_rate=0.2, n_classes=2, model_name=model_name
     )
     model = builder.build()
     
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
                   loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     
-    print("  [ResNet] Bắt đầu Training nhanh...")
-    model.fit(x_tr_cc, y_train, epochs=25, batch_size=64, verbose=0, validation_split=0.1)
+    print("  [MLP] Bắt đầu Training 200 Epochs...")
+    model.fit(x_tr_cc, y_train, epochs=200, batch_size=64, verbose=0, validation_split=0.1)
     
     probs = model.predict(x_te_cc, verbose=0)
     preds_test = np.argmax(probs, axis=1)
@@ -107,9 +105,9 @@ def main():
         cusum_acc, optimal_th, cusum_preds = evaluate_cusum(x_train, y_train, x_test, y_test)
         print(f"  [CUSUM] Độ chính xác: {cusum_acc*100:.2f}%")
         
-        # 3. Benchmark ResNet
-        resnet_acc, resnet_preds = evaluate_resnet(x_train, y_train, x_test, y_test, model_name=f"Model_{key}")
-        print(f"  [ResNet] Độ chính xác: {resnet_acc*100:.2f}%")
+        # 3. Benchmark MLP
+        mlp_acc, mlp_preds = evaluate_mlp(x_train, y_train, x_test, y_test, model_name=f"Model_{key}")
+        print(f"  [MLP] Độ chính xác: {mlp_acc*100:.2f}%")
         
         # PLOT CUSUM CONFUSION MATRIX (ROW 0)
         cm_cusum = confusion_matrix(y_test, cusum_preds)
@@ -119,15 +117,15 @@ def main():
         axes[0, col].set_xlabel('Predicted Label')
         axes[0, col].set_ylabel('True Label')
         
-        # PLOT RESNET CONFUSION MATRIX (ROW 1)
-        cm_resnet = confusion_matrix(y_test, resnet_preds)
-        disp_resnet = ConfusionMatrixDisplay(confusion_matrix=cm_resnet, display_labels=['No CP', 'Change Point'])
-        disp_resnet.plot(ax=axes[1, col], cmap='Oranges', colorbar=False, values_format='d')
-        axes[1, col].set_title(f"AutoCPD ResNet\n{name}\nAcc: {resnet_acc*100:.1f}%", fontweight='bold', color='#d62728')
+        # PLOT MLP CONFUSION MATRIX (ROW 1)
+        cm_mlp = confusion_matrix(y_test, mlp_preds)
+        disp_mlp = ConfusionMatrixDisplay(confusion_matrix=cm_mlp, display_labels=['No CP', 'Change Point'])
+        disp_mlp.plot(ax=axes[1, col], cmap='Oranges', colorbar=False, values_format='d')
+        axes[1, col].set_title(f"AutoCPD MLP (5 Layers)\n{name}\nAcc: {mlp_acc*100:.1f}%", fontweight='bold', color='#d62728')
         axes[1, col].set_xlabel('Predicted Label')
         axes[1, col].set_ylabel('True Label')
         
-        results[name] = {"CUSUM": cusum_acc, "ResNet": resnet_acc}
+        results[name] = {"CUSUM": cusum_acc, "MLP (5 Layers)": mlp_acc}
         col += 1
         
     plt.tight_layout()

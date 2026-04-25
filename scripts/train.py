@@ -61,7 +61,7 @@ def main():
     print("\n[PHASE 2] XÂY DỰNG MÔ HÌNH")
     builder = ModelBuilder(
         n=config.WINDOW_LENGTH,
-        n_trans=x_data.shape[1],
+        n_trans=x_data.shape[2],
         kernel_size=config.KERNEL_SIZE,
         n_filter=config.N_FILTER,
         dropout_rate=config.DROPOUT_RATE,
