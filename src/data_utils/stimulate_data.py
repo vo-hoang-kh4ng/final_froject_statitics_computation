@@ -33,7 +33,6 @@ def plot_samples(x, y, tau, num_samples=4):
 
 
 
-
 def stimulate_data(
     length_ts, sample_size, epsilon=0.05, mean_l=0, tau_bound=2, rho=0, scale=0, ar_model_name='AR0', sigma=1):
 
